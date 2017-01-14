@@ -140,10 +140,16 @@ class EmscriptenTransform {
 			switch (node.type) {
 				case 'VariableDeclaration':
 					node.declarations.forEach(v => {
+						let value;
+						if (node.init) {
+							value = node.init;
+						} else if (node.declarations[0].type === 'VariableDeclarator') {
+							value = node.declarations[0].init;
+						}
 						result.push({
 							type: 'Property',
 							key: {type: 'Identifier', name: v.id.name},
-							value: node.init || {type: 'Literal', value: null},
+							value: value || {type: 'Literal', value: null},
 						});
 					});
 					break;
