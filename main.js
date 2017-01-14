@@ -118,7 +118,8 @@ class EmscriptenTransform {
 						id.name = newName;
 					});
 					v.references.forEach(ref => {
-						ref.identifier.name = newName;
+						if (v.identifiers.indexOf(ref.identifier) !== -1) return;
+						ref.identifier.name = `_${newName}`;
 					});
 				} else if (this._exports[v.name] !== v.name) {
 					// rename exported symbols from local name to exported name
@@ -127,7 +128,8 @@ class EmscriptenTransform {
 						id.name = newName;
 					});
 					v.references.forEach(ref => {
-						ref.identifier.name = newName;
+						if (v.identifiers.indexOf(ref.identifier) !== -1) return;
+						ref.identifier.name = `_${newName}`;
 					});
 				}
 			});
