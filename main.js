@@ -103,7 +103,7 @@ class EmscriptenTransform {
 						if (
 							funcName !== depName && (
 								!this._dependencies[funcName] ||
-								this._dependencies[funcName].indexOf(depName) !== -1
+								this._dependencies[funcName].indexOf(depName) === -1
 							)
 						) {
 							this._dependencies[funcName] = this._dependencies[funcName] || [];
