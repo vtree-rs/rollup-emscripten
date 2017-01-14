@@ -5,6 +5,9 @@ import {parse} from 'acorn';
 import {analyze} from 'escope';
 import {generate} from 'escodegen';
 import {writeFile} from 'js-utils-fs';
+import mkdirp from 'mkdirp-promise';
+import {dirname} from 'path';
+
 // https://github.com/evanw/emscripten-library-generator/blob/5038b54bb8b5906572b09bc370f4b249776f2a3f/generator.js#L9-L19
 function isPureValue(value) {
 	return (
@@ -202,7 +205,7 @@ export default function main(options = {}) {
 		return {
 			code: outCode,
 			write(fileName) {
-				return writeFile(fileName, outCode);
+				return mkdirp(dirname(fileName)).then(() => writeFile(fileName, outCode));
 			},
 		};
 	});
