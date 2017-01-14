@@ -79,7 +79,7 @@ class EmscriptenTransform {
 				v.references.forEach(ref => {
 					let funcScope = ref.from;
 					while (
-						funcScope && (
+						funcScope.upper && (
 							funcScope.upper.type !== 'module' ||
 							funcScope.type !== 'function' ||
 							!funcScope.block.id
@@ -87,7 +87,7 @@ class EmscriptenTransform {
 					) {
 						funcScope = funcScope.upper;
 					}
-					if (funcScope) {
+					if (funcScope.upper) {
 						let funcName = funcScope.block.id.name;
 						if (!this._exports[funcName]) {
 							funcName = this._prefixName(funcName);
