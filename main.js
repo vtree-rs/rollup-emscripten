@@ -29,7 +29,7 @@ class EmscriptenTransform {
 		this._localPrefix = localPrefix;
 		this._input = input;
 		this._dependencies = {};
-		this._exports = {}; // [localName] = exportedName
+		this._exports = {}; // [localName] = exportedName; after renameSymbols: [exportedName] = 1
 	}
 
 	_checkNodes() {
@@ -74,46 +74,16 @@ class EmscriptenTransform {
 		return `_${this._localPrefix}_${name}`;
 	}
 
-	_prefixLocalAndDetermineDeps() {
-		analyze(this._input, {ecmaVersion: 6, sourceType: 'module'}).scopes.forEach(scope => {
+	_renameSymbols() {
+		this._scopes = analyze(this._input, {ecmaVersion: 6, sourceType: 'module'}).scopes;
+
+		this._scopes.forEach(scope => {
 			if (scope.type !== 'module') return;
 
 			scope.variables.forEach(v => {
-				v.references.forEach(ref => {
-					let funcScope = ref.from;
-					while (
-						funcScope.upper && (
-							funcScope.upper.type !== 'module' ||
-							funcScope.type !== 'function' ||
-							!funcScope.block.id
-						)
-					) {
-						funcScope = funcScope.upper;
-					}
-					if (funcScope.upper) {
-						let funcName = funcScope.block.id.name;
-						if (!this._exports[funcName]) {
-							funcName = this._prefixName(funcName);
-						}
-						let depName = v.name;
-						if (!this._exports[depName]) {
-							depName = this._prefixName(depName);
-						}
-
-						if (
-							funcName !== depName && (
-								!this._dependencies[funcName] ||
-								this._dependencies[funcName].indexOf(depName) === -1
-							)
-						) {
-							this._dependencies[funcName] = this._dependencies[funcName] || [];
-							this._dependencies[funcName].push(depName);
-						}
-					}
-				});
-
 				if (!this._exports[v.name]) {
 					const newName = this._prefixName(v.name);
+					v.name = newName;
 					v.identifiers.forEach(id => {
 						id.name = newName;
 					});
@@ -124,6 +94,9 @@ class EmscriptenTransform {
 				} else if (this._exports[v.name] !== v.name) {
 					// rename exported symbols from local name to exported name
 					const newName = this._exports[v.name];
+					delete this._exports[v.name];
+					v.name = newName;
+					this._exports[newName] = 1;
 					v.identifiers.forEach(id => {
 						id.name = newName;
 					});
@@ -132,6 +105,36 @@ class EmscriptenTransform {
 						ref.identifier.name = `_${newName}`;
 					});
 				}
+			});
+		});
+	}
+
+	_determineDeps() {
+		this._scopes.forEach(scope => {
+			if (scope.type !== 'module') return;
+
+			scope.variables.forEach(v => {
+				v.references.forEach(ref => {
+					if (v.identifiers.indexOf(ref.identifier) !== -1) return;
+
+					let funcScope = ref.from;
+					while (true) {
+						const found =
+							funcScope.upper &&
+							funcScope.upper.type === 'module' &&
+							funcScope.type === 'function' &&
+							funcScope.block.id;
+						if (found) break;
+						if (!funcScope.upper) break;
+						funcScope = funcScope.upper;
+					}
+					if (funcScope.upper) {
+						const funcName = funcScope.block.id.name;
+						const depName = v.name;
+						const deps = this._dependencies[funcName] = this._dependencies[funcName] || [];
+						if (deps.indexOf(depName) === -1) deps.push(depName);
+					}
+				});
 			});
 		});
 	}
@@ -191,7 +194,8 @@ class EmscriptenTransform {
 	transform() {
 		this._checkNodes();
 		this._determineAndNormalizeExports();
-		this._prefixLocalAndDetermineDeps();
+		this._renameSymbols();
+		this._determineDeps();
 		this._transformIntoProperties();
 		this._addDeps();
 
