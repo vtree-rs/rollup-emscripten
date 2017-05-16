@@ -1,6 +1,6 @@
 {
   "name": "rollup-emscripten",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "rollup + emscripten library converting",
   "main": "main.es5.js",
   "devDependencies": {
