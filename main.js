@@ -11,16 +11,15 @@ import {dirname} from 'path';
 // https://github.com/evanw/emscripten-library-generator/blob/5038b54bb8b5906572b09bc370f4b249776f2a3f/generator.js#L9-L19
 function isPureValue(value) {
 	return (
+		!value ||
 		value.type === 'Literal' ||
 		value.type === 'ThisExpression' ||
 		value.type === 'FunctionExpression' ||
 		value.type === 'UnaryExpression' && isPureValue(value.argument) ||
 		value.type === 'ArrayExpression' && value.elements.every(isPureValue) ||
 		value.type === 'ObjectExpression' && value.properties.every(e => isPureValue(e.value)) ||
-		(
-			value.type === 'BinaryExpression' || value.type === 'LogicalExpression') &&
-			isPureValue(value.left) && isPureValue(value.right
-		)
+		(value.type === 'BinaryExpression' || value.type === 'LogicalExpression') &&
+			isPureValue(value.left) && isPureValue(value.right)
 	);
 }
 
@@ -29,26 +28,67 @@ class EmscriptenTransform {
 		this._localPrefix = localPrefix;
 		this._input = input;
 		this._dependencies = {};
-		this._exports = {}; // [localName] = exportedName; after renameSymbols: [exportedName] = 1
+		this._exports = {}; // [localName] = exportedName
 	}
 
 	_checkNodes() {
 		this._input.body.forEach(node => {
-			if (node.type === 'VariableDeclaration') {
-				node.declarations.forEach(dec => {
-					if (dec.init && !isPureValue(dec.init)) {
-						const nodeJson = JSON.stringify(dec, undefined, '  ');
-						throw new Error(`Unsupported non-pure initializer:\n${nodeJson}`);
-					}
-				});
-			} else if (
+			if (
 				node.type !== 'FunctionDeclaration' &&
-				node.type !== 'ExportNamedDeclaration'
+				node.type !== 'ExportNamedDeclaration' &&
+				node.type !== 'VariableDeclaration'
 			) {
 				const nodeJson = JSON.stringify(node, undefined, '  ');
 				throw new Error(`Unsupported top-level statement:\n${nodeJson}`);
 			}
 		});
+	}
+
+	_determineAndNormalizeVars() {
+		const newBody = [];
+		this._input.body.forEach(node => {
+			if (node.type !== 'VariableDeclaration') {
+				newBody.push(node);
+				return;
+			}
+
+			node.declarations.forEach(decl => {
+				const blockBody = [{
+					type: 'VariableDeclaration',
+					kind: node.kind,
+					declarations: [decl],
+				}];
+
+				if (!isPureValue(decl.init)) {
+					// aid renamer by separating statements
+					blockBody.push({
+						type: 'ExpressionStatement',
+						expression: {
+							type: 'AssignmentExpression',
+							left: {type: 'Identifier', name: decl.id.name},
+							operator: '=',
+							right: decl.init,
+						},
+					});
+					decl.init = null;
+				}
+
+				decl.init = decl.init || {
+					type: 'UnaryExpression',
+					operator: 'void',
+					argument: {
+						type: 'Literal',
+						value: 0,
+					},
+				};
+
+				newBody.push({
+					type: 'BlockStatement',
+					body: blockBody,
+				});
+			});
+		});
+		this._input.body = newBody;
 	}
 
 	_determineAndNormalizeExports() {
@@ -71,7 +111,7 @@ class EmscriptenTransform {
 	}
 
 	_prefixName(name) {
-		return `_${this._localPrefix}_${name}`;
+		return `${this._localPrefix}_${name}`;
 	}
 
 	_renameSymbols() {
@@ -81,30 +121,25 @@ class EmscriptenTransform {
 			if (scope.type !== 'module') return;
 
 			scope.variables.forEach(v => {
-				if (!this._exports[v.name]) {
-					const newName = this._prefixName(v.name);
-					v.name = newName;
+				let refName = `_${v.name}`;
+				if (this._exports[v.name] !== v.name) {
+					if (this._exports[v.name]) {
+						const newName = this._exports[v.name];
+						delete this._exports[v.name];
+						v.name = newName;
+						this._exports[newName] = newName;
+					} else {
+						refName = this._prefixName(v.name);
+						v.name = `$${refName}`;
+					}
 					v.identifiers.forEach(id => {
-						id.name = newName;
-					});
-					v.references.forEach(ref => {
-						if (v.identifiers.indexOf(ref.identifier) !== -1) return;
-						ref.identifier.name = `_${newName}`;
-					});
-				} else if (this._exports[v.name] !== v.name) {
-					// rename exported symbols from local name to exported name
-					const newName = this._exports[v.name];
-					delete this._exports[v.name];
-					v.name = newName;
-					this._exports[newName] = 1;
-					v.identifiers.forEach(id => {
-						id.name = newName;
-					});
-					v.references.forEach(ref => {
-						if (v.identifiers.indexOf(ref.identifier) !== -1) return;
-						ref.identifier.name = `_${newName}`;
+						id.name = v.name;
 					});
 				}
+				v.references.forEach(ref => {
+					if (v.identifiers.indexOf(ref.identifier) !== -1) return;
+					ref.identifier.name = refName;
+				});
 			});
 		});
 	}
@@ -117,21 +152,25 @@ class EmscriptenTransform {
 				v.references.forEach(ref => {
 					if (v.identifiers.indexOf(ref.identifier) !== -1) return;
 
-					let funcScope = ref.from;
-					while (true) {
-						const found =
-							funcScope.upper &&
-							funcScope.upper.type === 'module' &&
-							funcScope.type === 'function' &&
-							funcScope.block.id;
-						if (found) break;
-						if (!funcScope.upper) break;
-						funcScope = funcScope.upper;
+					let foundId = null;
+					for (let ownerScope = ref.from; ownerScope.upper; ownerScope = ownerScope.upper) {
+						if (ownerScope.upper.type === 'module') {
+							if (ownerScope.type === 'function') {
+								foundId = ownerScope.block.id;
+							} else if (ownerScope.type === 'block') {
+								const {body} = ownerScope.block;
+								// don't include autogenerated identifier for the postset assignment
+								if (ref.identifier !== body[1].expression.left) {
+									foundId = body[0].declarations[0].id;
+								}
+							}
+							break;
+						}
 					}
-					if (funcScope.upper) {
-						const funcName = funcScope.block.id.name;
+					if (foundId) {
+						const targetName = foundId.name;
 						const depName = v.name;
-						const deps = this._dependencies[funcName] = this._dependencies[funcName] || [];
+						const deps = this._dependencies[targetName] = this._dependencies[targetName] || [];
 						if (deps.indexOf(depName) === -1) deps.push(depName);
 					}
 				});
@@ -143,26 +182,33 @@ class EmscriptenTransform {
 		const result = [];
 		this._input.body.forEach(node => {
 			switch (node.type) {
-				case 'VariableDeclaration':
-					node.declarations.forEach(v => {
-						let value;
-						if (node.init) {
-							value = node.init;
-						} else if (node.declarations[0].type === 'VariableDeclarator') {
-							value = node.declarations[0].init;
-						}
+				case 'BlockStatement': {
+					if (node.body[0].type !== 'VariableDeclaration') {
+						throw new Error('unreachable');
+					}
+					const decl = node.body[0].declarations[0];
+					result.push({
+						type: 'Property',
+						key: decl.id,
+						value: decl.init,
+					});
+					if (node.body.length === 2) {
 						result.push({
 							type: 'Property',
-							key: {type: 'Identifier', name: v.id.name},
-							value: value || {type: 'Literal', value: null},
+							key: {type: 'Identifier', name: `${decl.id.name}__postset`},
+							value: {
+								type: 'Literal',
+								value: generate(node.body[1]),
+							},
 						});
-					});
+					}
 					break;
+				}
 
 				case 'FunctionDeclaration':
 					result.push({
 						type: 'Property',
-						key: {type: 'Identifier', name: node.id.name},
+						key: node.id,
 						value: {
 							type: 'FunctionExpression',
 							params: node.params,
@@ -193,6 +239,7 @@ class EmscriptenTransform {
 
 	transform() {
 		this._checkNodes();
+		this._determineAndNormalizeVars();
 		this._determineAndNormalizeExports();
 		this._renameSymbols();
 		this._determineDeps();
