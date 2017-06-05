@@ -1,0 +1,84 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`exported function referenced by another one 1`] = `
+Object.assign(LibraryManager.library, {
+    x: function () {
+    },
+    y: function () {
+        return _x();
+    },
+    y__deps: ['x']
+});
+`;
+
+exports[`exported local variable using a local function 1`] = `
+Object.assign(LibraryManager.library, {
+    x: void 0,
+    x__postset: '_x = test_getX();',
+    $test_getX: function () {
+        return 42;
+    },
+    x__deps: ['$test_getX']
+});
+`;
+
+exports[`exporting a variable and a function with custom names 1`] = `
+Object.assign(LibraryManager.library, {
+    exportedVar: 10,
+    exportedFunc: function () {
+    }
+});
+`;
+
+exports[`impure local variable used by exported function 1`] = `
+Object.assign(LibraryManager.library, {
+    $test_x: void 0,
+    $test_x__postset: 'test_x = new ArrayBuffer(10);',
+    getX: function () {
+        return test_x;
+    },
+    getX__deps: ['$test_x']
+});
+`;
+
+exports[`local function referenced by exported one 1`] = `
+Object.assign(LibraryManager.library, {
+    $test_x: function () {
+    },
+    y: function () {
+        return test_x();
+    },
+    y__deps: ['$test_x']
+});
+`;
+
+exports[`pure local variable used by exported function 1`] = `
+Object.assign(LibraryManager.library, {
+    $test_x: 10 + 20 - ~30,
+    getX: function () {
+        return test_x;
+    },
+    getX__deps: ['$test_x']
+});
+`;
+
+exports[`unsupported top-level statement 1`] = `
+Unsupported top-level statement:
+{
+  "type": "ExpressionStatement",
+  "start": 0,
+  "end": 13,
+  "expression": {
+    "type": "CallExpression",
+    "start": 0,
+    "end": 12,
+    "callee": {
+      "type": "Identifier",
+      "start": 0,
+      "end": 10,
+      "name": "sideEffect"
+    },
+    "arguments": []
+  }
+}
+`;

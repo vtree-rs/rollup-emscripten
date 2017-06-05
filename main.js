@@ -8,6 +8,7 @@ import {writeFile} from 'js-utils-fs';
 import mkdirp from 'mkdirp-promise';
 import {dirname} from 'path';
 
+// eslint-disable-next-line
 // https://github.com/evanw/emscripten-library-generator/blob/5038b54bb8b5906572b09bc370f4b249776f2a3f/generator.js#L9-L19
 function isPureValue(value) {
 	return (
