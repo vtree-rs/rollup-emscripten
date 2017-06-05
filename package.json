@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "rollup + emscripten library converting",
   "main": "main.es5.js",
+  "repository": "vtree-rs/rollup-emscripten",
   "license": "MIT",
   "devDependencies": {
     "babel-cli": "^6.18.0",
