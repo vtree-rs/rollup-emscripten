@@ -28,7 +28,7 @@ class EmscriptenTransform {
 		this._localPrefix = localPrefix;
 		this._input = input;
 		this._dependencies = {};
-		this._exports = {}; // [localName] = exportedName; after renameSymbols: [exportedName] = 1
+		this._exports = {}; // [localName] = exportedName
 	}
 
 	_checkNodes() {
@@ -121,32 +121,23 @@ class EmscriptenTransform {
 			if (scope.type !== 'module') return;
 
 			scope.variables.forEach(v => {
-				if (!this._exports[v.name]) {
-					const newName = this._prefixName(v.name);
-					v.name = newName;
-					v.identifiers.forEach(id => {
-						id.name = newName;
-					});
-					v.references.forEach(ref => {
-						if (v.identifiers.indexOf(ref.identifier) !== -1) return;
-						ref.identifier.name = `_${newName}`;
-					});
-				} else {
-					if (this._exports[v.name] !== v.name) {
-						// rename exported symbols from local name to exported name
+				if (this._exports[v.name] !== v.name) {
+					if (this._exports[v.name]) {
 						const newName = this._exports[v.name];
 						delete this._exports[v.name];
 						v.name = newName;
-						this._exports[newName] = 1;
-						v.identifiers.forEach(id => {
-							id.name = newName;
-						});
+						this._exports[newName] = newName;
+					} else {
+						v.name = this._prefixName(v.name);
 					}
-					v.references.forEach(ref => {
-						if (v.identifiers.indexOf(ref.identifier) !== -1) return;
-						ref.identifier.name = `_${v.name}`;
+					v.identifiers.forEach(id => {
+						id.name = v.name;
 					});
 				}
+				v.references.forEach(ref => {
+					if (v.identifiers.indexOf(ref.identifier) !== -1) return;
+					ref.identifier.name = `_${v.name}`;
+				});
 			});
 		});
 	}
