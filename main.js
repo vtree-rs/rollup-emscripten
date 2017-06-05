@@ -131,18 +131,20 @@ class EmscriptenTransform {
 						if (v.identifiers.indexOf(ref.identifier) !== -1) return;
 						ref.identifier.name = `_${newName}`;
 					});
-				} else if (this._exports[v.name] !== v.name) {
-					// rename exported symbols from local name to exported name
-					const newName = this._exports[v.name];
-					delete this._exports[v.name];
-					v.name = newName;
-					this._exports[newName] = 1;
-					v.identifiers.forEach(id => {
-						id.name = newName;
-					});
+				} else {
+					if (this._exports[v.name] !== v.name) {
+						// rename exported symbols from local name to exported name
+						const newName = this._exports[v.name];
+						delete this._exports[v.name];
+						v.name = newName;
+						this._exports[newName] = 1;
+						v.identifiers.forEach(id => {
+							id.name = newName;
+						});
+					}
 					v.references.forEach(ref => {
 						if (v.identifiers.indexOf(ref.identifier) !== -1) return;
-						ref.identifier.name = `_${newName}`;
+						ref.identifier.name = `_${v.name}`;
 					});
 				}
 			});
