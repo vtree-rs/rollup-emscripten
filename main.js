@@ -111,7 +111,7 @@ class EmscriptenTransform {
 	}
 
 	_prefixName(name) {
-		return `_${this._localPrefix}_${name}`;
+		return `${this._localPrefix}_${name}`;
 	}
 
 	_renameSymbols() {
@@ -121,6 +121,7 @@ class EmscriptenTransform {
 			if (scope.type !== 'module') return;
 
 			scope.variables.forEach(v => {
+				let refName = `_${v.name}`;
 				if (this._exports[v.name] !== v.name) {
 					if (this._exports[v.name]) {
 						const newName = this._exports[v.name];
@@ -128,7 +129,8 @@ class EmscriptenTransform {
 						v.name = newName;
 						this._exports[newName] = newName;
 					} else {
-						v.name = this._prefixName(v.name);
+						refName = this._prefixName(v.name);
+						v.name = `$${refName}`;
 					}
 					v.identifiers.forEach(id => {
 						id.name = v.name;
@@ -136,7 +138,7 @@ class EmscriptenTransform {
 				}
 				v.references.forEach(ref => {
 					if (v.identifiers.indexOf(ref.identifier) !== -1) return;
-					ref.identifier.name = `_${v.name}`;
+					ref.identifier.name = refName;
 				});
 			});
 		});
