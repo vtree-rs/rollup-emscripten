@@ -11,6 +11,16 @@ Object.assign(LibraryManager.library, {
 });
 `;
 
+exports[`exported function referencing a constant 1`] = `
+Object.assign(LibraryManager.library, {
+    $test_answer: 42,
+    getAnswer: function () {
+        return test_answer;
+    },
+    getAnswer__deps: ['$test_answer']
+});
+`;
+
 exports[`exported local variable using a local function 1`] = `
 Object.assign(LibraryManager.library, {
     x: void 0,

@@ -56,7 +56,7 @@ class EmscriptenTransform {
 			node.declarations.forEach(decl => {
 				const blockBody = [{
 					type: 'VariableDeclaration',
-					kind: node.kind,
+					kind: 'var',
 					declarations: [decl],
 				}];
 

@@ -75,3 +75,11 @@ rtest('exporting a variable and a function with custom names', `
 		localFunc as exportedFunc
 	};
 `);
+
+rtest('exported function referencing a constant', `
+	const answer = 42;
+
+	export function getAnswer() {
+		return answer;
+	}
+`);
