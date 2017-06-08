@@ -200,7 +200,7 @@ class EmscriptenTransform {
 							key: {type: 'Identifier', name: `${decl.id.name}__postset`},
 							value: {
 								type: 'Literal',
-								value: generate(node.body[1]),
+								value: generate(node.body[1].expression),
 							},
 						});
 					}

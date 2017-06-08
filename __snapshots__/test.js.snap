@@ -24,7 +24,7 @@ Object.assign(LibraryManager.library, {
 exports[`exported local variable using a local function 1`] = `
 Object.assign(LibraryManager.library, {
     x: void 0,
-    x__postset: '_x = test_getX();',
+    x__postset: '_x = test_getX()',
     $test_getX: function () {
         return 42;
     },
@@ -43,7 +43,7 @@ Object.assign(LibraryManager.library, {
 exports[`impure local variable used by exported function 1`] = `
 Object.assign(LibraryManager.library, {
     $test_x: void 0,
-    $test_x__postset: 'test_x = new ArrayBuffer(10);',
+    $test_x__postset: 'test_x = new ArrayBuffer(10)',
     getX: function () {
         return test_x;
     },
